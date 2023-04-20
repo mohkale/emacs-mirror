@@ -1690,9 +1690,13 @@ enum face_box_type
 
 enum face_underline_type
 {
+  // Note: Order matches the order of the Smulx terminfo extension.
   FACE_NO_UNDERLINE = 0,
   FACE_UNDER_LINE,
-  FACE_UNDER_WAVE
+  FACE_DOUBLE_UNDER_LINE,
+  FACE_UNDER_WAVE,
+  FACE_DOTTED_UNDER_LINE,
+  FACE_DASHED_UNDER_LINE,
 };
 
 /* Structure describing a realized face.
@@ -1776,7 +1780,7 @@ struct face
   ENUM_BF (face_box_type) box : 2;
 
   /* Style of underlining. */
-  ENUM_BF (face_underline_type) underline : 2;
+  ENUM_BF (face_underline_type) underline : 3;
 
   /* If `box' above specifies a 3D type, true means use box_color for
      drawing shadows.  */

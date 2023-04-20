@@ -3311,7 +3311,11 @@ FRAME 0 means change the face on all frames, and change the default
                 }
 
               else if (EQ (key, QCstyle)
-                       && !(EQ (val, Qline) || EQ (val, Qwave)))
+                       && !(EQ (val, Qline) ||
+                            EQ (val, Qdouble) ||
+                            EQ (val, Qwave) ||
+                            EQ (val, Qdotted) ||
+                            EQ (val, Qdashed)))
                 {
                   valid_p = false;
                   break;
@@ -5266,6 +5270,7 @@ gui_supports_face_attributes_p (struct frame *f,
                                 Lisp_Object attrs[LFACE_VECTOR_SIZE],
                                 struct face *def_face)
 {
+  Lisp_Object val;
   Lisp_Object *def_attrs = def_face->lface;
   Lisp_Object lattrs[LFACE_VECTOR_SIZE];
 
@@ -5359,6 +5364,17 @@ gui_supports_face_attributes_p (struct frame *f,
 	  }
       return false;
     }
+
+  /* Check supported underline styles. */
+  val = attrs[LFACE_UNDERLINE_INDEX];
+  if (!UNSPECIFIEDP (val)) {
+    if (EQ (CAR_SAFE (val), QCstyle)) {
+      if (!(EQ (CAR_SAFE (CDR_SAFE (val)), Qline) ||
+            EQ (CAR_SAFE (CDR_SAFE (val)), Qwave))) {
+        return false; /* Unsupported underline style */
+      }
+    }
+  }
 
   /* Everything checks out, this face is supported.  */
   return true;
@@ -7229,6 +7245,9 @@ syms_of_xfaces (void)
   DEFSYM (QCposition, ":position");
   DEFSYM (Qline, "line");
   DEFSYM (Qwave, "wave");
+  DEFSYM (Qdouble, "double");
+  DEFSYM (Qdotted, "dotted");
+  DEFSYM (Qdashed, "dashed");
   DEFSYM (Qreleased_button, "released-button");
   DEFSYM (Qpressed_button, "pressed-button");
   DEFSYM (Qflat_button, "flat-button");
