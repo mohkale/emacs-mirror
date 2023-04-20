@@ -171,6 +171,10 @@ struct tty_display_info
                                    non-blank position.  Must clear before writing _.  */
   int TF_teleray;               /* termcap xt flag: many weird consequences.
                                    For t1061. */
+  const char *TF_set_underline_style;   /* termcap Smulx entry: Switches the underline
+                                           style based on the parameter. Param should
+                                           be one of: 0 (none), 1 (straight), 2 (double),
+                                           3 (wave), 4 (dotted), or 5 (dashed). */
 
   int RPov;                     /* # chars to start a TS_repeat */
 

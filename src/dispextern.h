@@ -1812,7 +1812,7 @@ struct face
      string meaning the default color of the TTY.  */
   bool_bf tty_bold_p : 1;
   bool_bf tty_italic_p : 1;
-  bool_bf tty_underline_p : 1;
+  ENUM_BF (face_underline_type) tty_underline : 3;
   bool_bf tty_reverse_p : 1;
   bool_bf tty_strike_through_p : 1;
 
@@ -3425,6 +3425,7 @@ enum tool_bar_item_image
 #define TTY_CAP_DIM		0x08
 #define TTY_CAP_ITALIC  	0x10
 #define TTY_CAP_STRIKE_THROUGH	0x20
+#define TTY_CAP_UNDERLINE_STYLED	0x32 & TTY_CAP_UNDERLINE
 
 
 /***********************************************************************

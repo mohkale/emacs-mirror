@@ -420,6 +420,22 @@ These characters can now be input with 'C-x 8 a e' and 'C-x 8 A E',
 respectively, in addition to the existing translations 'C-x 8 / e' and
 'C-x 8 / E'.
 
+---
+** Support for 'styled-underline' face attributes on TTY frames
+If your terminals termcap or terminfo database entry has the 'Su' or
+'Smulx' capability defined, Emacs will now emit the prescribed escape
+sequence necessary to render faces with styled underlines on TTY
+frames.
+
+Styled underlines are any underlines containing a non-default
+underline style.  The available underline styles for TTY frames are
+'double', 'wave', 'dotted', and 'dashed'.
+
+The 'Smulx' capability should define the actual sequence needed to
+render styled underlines. If ommitted, but the 'Su' flag is defined,
+then a default sequence will be used. It's recommended to use 'Smulx'
+instead of 'Su', with priority being given to 'Smulx'.
+
 
 * Changes in Specialized Modes and Packages in Emacs 30.1
 

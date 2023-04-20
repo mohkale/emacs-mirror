@@ -2014,8 +2014,17 @@ turn_on_face (struct frame *f, int face_id)
 	OUTPUT1 (tty, tty->TS_enter_dim_mode);
     }
 
-  if (face->tty_underline_p && MAY_USE_WITH_COLORS_P (tty, NC_UNDERLINE))
-    OUTPUT1_IF (tty, tty->TS_enter_underline_mode);
+  if (face->tty_underline && MAY_USE_WITH_COLORS_P (tty, NC_UNDERLINE)) {
+    if (face->tty_underline == FACE_UNDER_LINE ||
+        !tty->TF_set_underline_style) {
+      OUTPUT1_IF (tty, tty->TS_enter_underline_mode);
+    } else if (tty->TF_set_underline_style) {
+      char *p;
+      p = tparam(tty->TF_set_underline_style, NULL, 0, face->tty_underline, 0, 0, 0);
+      OUTPUT (tty, p);
+      xfree (p);
+    }
+  }
 
   if (face->tty_strike_through_p
       && MAY_USE_WITH_COLORS_P (tty, NC_STRIKE_THROUGH))
@@ -2061,7 +2070,7 @@ turn_off_face (struct frame *f, int face_id)
       if (face->tty_bold_p
 	  || face->tty_italic_p
 	  || face->tty_reverse_p
-	  || face->tty_underline_p
+	  || face->tty_underline
 	  || face->tty_strike_through_p)
 	{
 	  OUTPUT1_IF (tty, tty->TS_exit_attribute_mode);
@@ -2073,7 +2082,7 @@ turn_off_face (struct frame *f, int face_id)
     {
       /* If we don't have "me" we can only have those appearances
 	 that have exit sequences defined.  */
-      if (face->tty_underline_p)
+      if (face->tty_underline)
 	OUTPUT_IF (tty, tty->TS_exit_underline_mode);
     }
 
@@ -2104,6 +2113,9 @@ tty_capable_p (struct tty_display_info *tty, unsigned int caps)
   TTY_CAPABLE_P_TRY (tty,
 		     TTY_CAP_UNDERLINE,	  tty->TS_enter_underline_mode,
 		     NC_UNDERLINE);
+  TTY_CAPABLE_P_TRY (tty,
+		     TTY_CAP_UNDERLINE_STYLED,	  tty->TF_set_underline_style,
+             NC_UNDERLINE);
   TTY_CAPABLE_P_TRY (tty,
 		     TTY_CAP_BOLD,	  tty->TS_enter_bold_mode, NC_BOLD);
   TTY_CAPABLE_P_TRY (tty,
@@ -4359,6 +4371,21 @@ use the Bourne shell command 'TERM=...; export TERM' (C-shell:\n\
   tty->TF_standout_motion = tgetflag ("ms");
   tty->TF_underscore = tgetflag ("ul");
   tty->TF_teleray = tgetflag ("xt");
+
+  // Styled underlines.
+  //
+  // Support for this is provided either by the escape sequence in
+  // Smulx or the Su flag. The latter results in a common default
+  // escape sequence and is not recommended.
+#ifdef TERMINFO
+  tty->TF_set_underline_style = tigetstr("Smulx");
+  if (tty->TF_set_underline_style == (char *) (intptr_t) -1)
+    tty->TF_set_underline_style = NULL;
+#else
+  tty->TF_set_underline_style = tgetstr("Smulx", address);
+#endif
+  if (!tty->TF_set_underline_style && tgetflag("Su"))
+    tty->TF_set_underline_style = "\x1b[4:%p1%dm";
 
 #else /* DOS_NT */
 #ifdef WINDOWSNT
