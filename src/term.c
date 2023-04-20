@@ -2050,6 +2050,14 @@ turn_on_face (struct frame *f, int face_id)
 	  OUTPUT (tty, p);
 	  xfree (p);
 	}
+
+      ts = tty->TF_set_underline_color;
+      if (ts && face->underline_color)
+	{
+          p = tparam (ts, NULL, 0, face->underline_color, 0, 0, 0);
+	  OUTPUT (tty, p);
+	  xfree (p);
+	}
     }
 }
 
@@ -4386,6 +4394,9 @@ use the Bourne shell command 'TERM=...; export TERM' (C-shell:\n\
 #endif
   if (!tty->TF_set_underline_style && tgetflag("Su"))
     tty->TF_set_underline_style = "\x1b[4:%p1%dm";
+
+  if (tty->TF_set_underline_style)
+    tty->TF_set_underline_color = "\x1b[58:2::%p1%{65536}%/%d:%p1%{256}%/%{255}%&%d:%p1%{255}%&%dm";
 
 #else /* DOS_NT */
 #ifdef WINDOWSNT

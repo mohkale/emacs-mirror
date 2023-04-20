@@ -5469,7 +5469,7 @@ tty_supports_face_attributes_p (struct frame *f,
   if (!UNSPECIFIEDP (val))
     {
       if (STRINGP (val))
-	return false;		/* ttys can't use colored underlines */
+	test_caps |= TTY_CAP_UNDERLINE_STYLED;
       else if (EQ (CAR_SAFE (val), QCstyle))
     {
         if (!(EQ (CAR_SAFE (CDR_SAFE (val)), Qline) ||
@@ -6572,14 +6572,18 @@ realize_tty_face (struct face_cache *cache,
   underline = attrs[LFACE_UNDERLINE_INDEX];
   if (NILP (underline)) {
     face->tty_underline = FACE_NO_UNDERLINE;
+    face->underline_color = 0;
   } else if (EQ (underline, Qt)) {
     face->tty_underline = FACE_UNDER_LINE;
+    face->underline_color = 0;
   } else if (STRINGP (underline)) {
     face->tty_underline = FACE_UNDER_LINE;
+	face->underline_color = load_color (f, face, underline, LFACE_UNDERLINE_INDEX);
   } else if (CONSP (underline)) {
-    /* `(:style STYLE)'.
+    /* `(:color COLOR :style STYLE)'.
        STYLE being one of `line', `double', `wave', `dotted' or `dashed'. */
     face->tty_underline = FACE_UNDER_LINE;
+    face->underline_color = 0;
 
     while (CONSP (underline)) {
       Lisp_Object keyword, value;
@@ -6592,7 +6596,13 @@ realize_tty_face (struct face_cache *cache,
       value = XCAR (underline);
       underline = XCDR (underline);
 
-      if (EQ (keyword, QCstyle)) {
+      if (EQ (keyword, QCcolor)) {
+        if (EQ (value, Qforeground_color))
+          face->underline_color = 0;
+        else if (STRINGP (value))
+          face->underline_color = load_color (f, face, value, LFACE_UNDERLINE_INDEX);
+      }
+      else if (EQ (keyword, QCstyle)) {
         if (EQ (value, Qline))
           face->tty_underline = FACE_UNDER_LINE;
         else if (EQ (value, Qdouble))
