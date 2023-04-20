@@ -141,7 +141,10 @@
 		   (const :format "" :value :style)
 		   (choice :tag "Style"
 			   (const :tag "Line" line)
-			   (const :tag "Wave" wave))
+			   (const :tag "Double" double)
+			   (const :tag "Wave" wave)
+			   (const :tag "Dotted" dotted)
+			   (const :tag "Dashed" dashed))
                    (const :format "" :value :position)
                    (choice :tag "Position"
                            (const :tag "At Default Position" nil)

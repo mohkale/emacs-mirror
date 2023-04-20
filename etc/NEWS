@@ -311,6 +311,19 @@ Previously, it was set to t but this broke remote file name detection.
 ** Multi-character key echo now ends with a suggestion to use Help.
 Customize 'echo-keystrokes-help' to nil to prevent that.
 
+---
+** Support for 'styled' and 'colored' underline face attributes on TTY frames
+If your terminals termcap or terminfo database entry has the 'Su' or
+'Smulx' capability defined, Emacs will now emit the prescribed escape
+sequence necessary to render faces with styled underlines on TTY
+frames.
+
+Styled underlines are any underlines containing a non-default
+underline style or a color other than the foreground-color.
+The available underline styles for TTY frames are 'double', 'wave',
+'dotted', and 'dashed'.  These are currently supported by Kitty,
+libvte, and st (through the undercurl patch) among other terminals.
+
 
 * Editing Changes in Emacs 30.1
 

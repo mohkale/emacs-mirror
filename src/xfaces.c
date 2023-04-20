@@ -3311,7 +3311,11 @@ FRAME 0 means change the face on all frames, and change the default
                 }
 
               else if (EQ (key, QCstyle)
-                       && !(EQ (val, Qline) || EQ (val, Qwave)))
+					   && !(EQ (val, Qline)
+							|| EQ (val, Qdouble)
+							|| EQ (val, Qwave)
+							|| EQ (val, Qdotted)
+							|| EQ (val, Qdashed)))
                 {
                   valid_p = false;
                   break;
@@ -5266,6 +5270,7 @@ gui_supports_face_attributes_p (struct frame *f,
                                 Lisp_Object attrs[LFACE_VECTOR_SIZE],
                                 struct face *def_face)
 {
+  Lisp_Object val;
   Lisp_Object *def_attrs = def_face->lface;
   Lisp_Object lattrs[LFACE_VECTOR_SIZE];
 
@@ -5360,6 +5365,20 @@ gui_supports_face_attributes_p (struct frame *f,
       return false;
     }
 
+  /* Check supported underline styles. */
+  val = attrs[LFACE_UNDERLINE_INDEX];
+  if (!UNSPECIFIEDP (val))
+	{
+	if (EQ (CAR_SAFE (val), QCstyle))
+	  {
+		if (!(EQ (CAR_SAFE (CDR_SAFE (val)), Qline)
+			  || EQ (CAR_SAFE (CDR_SAFE (val)), Qwave)))
+		  {
+			return false; /* Unsupported underline style */
+		  }
+	  }
+	}
+
   /* Everything checks out, this face is supported.  */
   return true;
 }
@@ -5452,15 +5471,26 @@ tty_supports_face_attributes_p (struct frame *f,
   val = attrs[LFACE_UNDERLINE_INDEX];
   if (!UNSPECIFIEDP (val))
     {
-      if (STRINGP (val))
-	return false;		/* ttys can't use colored underlines */
-      else if (EQ (CAR_SAFE (val), QCstyle) && EQ (CAR_SAFE (CDR_SAFE (val)), Qwave))
-	return false;		/* ttys can't use wave underlines */
-      else if (face_attr_equal_p (val, def_attrs[LFACE_UNDERLINE_INDEX]))
-	return false;		/* same as default */
-      else
-	test_caps |= TTY_CAP_UNDERLINE;
-    }
+	if (STRINGP (val))
+		test_caps |= TTY_CAP_UNDERLINE_STYLED;
+	else if (EQ (CAR_SAFE (val), QCstyle))
+	  {
+	if (!(EQ (CAR_SAFE (CDR_SAFE (val)), Qline)
+		  || EQ (CAR_SAFE (CDR_SAFE (val)), Qdouble)
+		  || EQ (CAR_SAFE (CDR_SAFE (val)), Qwave)
+		  || EQ (CAR_SAFE (CDR_SAFE (val)), Qdotted)
+		  || EQ (CAR_SAFE (CDR_SAFE (val)), Qdashed)))
+	  {
+		return false; /* Face uses an unsupported underline style.	*/
+	  }
+
+	test_caps |= TTY_CAP_UNDERLINE_STYLED;
+	  }
+	else if (face_attr_equal_p (val, def_attrs[LFACE_UNDERLINE_INDEX]))
+		return false;  /* same as default */
+	else
+		test_caps |= TTY_CAP_UNDERLINE;
+  }
 
   /* inverse video */
   val = attrs[LFACE_INVERSE_INDEX];
@@ -6381,6 +6411,8 @@ realize_gui_face (struct face_cache *cache, Lisp_Object attrs[LFACE_VECTOR_SIZE]
                 face->underline = FACE_UNDER_LINE;
               else if (EQ (value, Qwave))
                 face->underline = FACE_UNDER_WAVE;
+	      else
+		face->underline = FACE_UNDER_LINE;
             }
 	  else if (EQ (keyword, QCposition))
 	    {
@@ -6434,7 +6466,53 @@ realize_gui_face (struct face_cache *cache, Lisp_Object attrs[LFACE_VECTOR_SIZE]
 /* Map a specified color of face FACE on frame F to a tty color index.
    IDX is either LFACE_FOREGROUND_INDEX or LFACE_BACKGROUND_INDEX, and
    specifies which color to map.  Set *DEFAULTED to true if mapping to the
-   default foreground/background colors.  */
+   default foreground/background colors. TODO(me): Update docstring. */
+
+static void
+my_map_tty_color (struct frame *f, struct face *face, Lisp_Object color,
+		  enum lface_attribute_index idx)
+{
+	Lisp_Object frame, def;
+	unsigned long default_pixel = FACE_TTY_DEFAULT_FG_COLOR;
+	unsigned long pixel = default_pixel;
+
+	eassert (idx == LFACE_FOREGROUND_INDEX
+		 || idx == LFACE_BACKGROUND_INDEX
+		 || idx == LFACE_UNDERLINE_INDEX);
+
+	XSETFRAME (frame, f);
+
+	if (STRINGP (color)
+	    && SCHARS (color)
+	    && CONSP (Vtty_defined_color_alist)
+	    && (def = assoc_no_quit (color, call1 (Qtty_color_alist, frame)),
+		CONSP (def)))
+	{
+		/* Associations in tty-defined-color-alist are of the form
+		   (NAME INDEX R G B).  We need the INDEX part.  */
+		pixel = XFIXNUM (XCAR (XCDR (def)));
+	}
+
+	if (pixel == default_pixel && STRINGP (color))
+	{
+		pixel = load_color (f, face, color, idx);
+	}
+
+	switch (idx)
+	{
+		case LFACE_UNDERLINE_INDEX:
+			face->underline_color = pixel;
+			break;
+		case LFACE_FOREGROUND_INDEX:
+			face->foreground = pixel;
+			break;
+		case LFACE_BACKGROUND_INDEX:
+			face->background = pixel;
+			break;
+		default:
+			emacs_abort ();
+	}
+}
 
 static void
 map_tty_color (struct frame *f, struct face *face,
@@ -6515,6 +6593,7 @@ realize_tty_face (struct face_cache *cache,
 {
   struct face *face;
   int weight, slant;
+  Lisp_Object underline;
   bool face_colors_defaulted = false;
   struct frame *f = cache->f;
 
@@ -6534,12 +6613,71 @@ realize_tty_face (struct face_cache *cache,
     face->tty_bold_p = true;
   if (slant != 100)
     face->tty_italic_p = true;
-  if (!NILP (attrs[LFACE_UNDERLINE_INDEX]))
-    face->tty_underline_p = true;
   if (!NILP (attrs[LFACE_INVERSE_INDEX]))
     face->tty_reverse_p = true;
   if (!NILP (attrs[LFACE_STRIKE_THROUGH_INDEX]))
     face->tty_strike_through_p = true;
+
+  /* Text underline.  */
+  underline = attrs[LFACE_UNDERLINE_INDEX];
+  if (NILP (underline))
+    {
+	face->underline = FACE_NO_UNDERLINE;
+	face->underline_color = 0;
+    }
+  else if (EQ (underline, Qt))
+    {
+	face->underline = FACE_UNDER_LINE;
+	face->underline_color = 0;
+    }
+  else if (STRINGP (underline))
+    {
+	face->underline = FACE_UNDER_LINE;
+	my_map_tty_color (f, face, underline, LFACE_UNDERLINE_INDEX);
+    }
+  else if (CONSP (underline))
+    {
+	/* `(:color COLOR :style STYLE)'.
+	   STYLE being one of `line', `double', `wave', `dotted' or `dashed'.  */
+	face->underline = FACE_UNDER_LINE;
+	face->underline_color = 0;
+
+	while (CONSP (underline))
+	  {
+		Lisp_Object keyword, value;
+
+		keyword = XCAR (underline);
+		underline = XCDR (underline);
+
+		if (!CONSP (underline))
+			break;
+		value = XCAR (underline);
+		underline = XCDR (underline);
+
+		if (EQ (keyword, QCcolor))
+		  {
+			if (EQ (value, Qforeground_color))
+				face->underline_color = 0;
+			else if (STRINGP (value))
+				my_map_tty_color (f, face, value, LFACE_UNDERLINE_INDEX);
+		  }
+		else if (EQ (keyword, QCstyle))
+		  {
+			if (EQ (value, Qline))
+				face->underline = FACE_UNDER_LINE;
+			else if (EQ (value, Qdouble))
+				face->underline = FACE_DOUBLE_UNDER_LINE;
+			else if (EQ (value, Qwave))
+				face->underline = FACE_UNDER_WAVE;
+			else if (EQ (value, Qdotted))
+				face->underline = FACE_DOTTED_UNDER_LINE;
+			else if (EQ (value, Qdashed))
+				face->underline = FACE_DASHED_UNDER_LINE;
+			else
+				face->underline = FACE_UNDER_LINE;
+		  }
+	  }
+    }
 
   /* Map color names to color indices.  */
   map_tty_color (f, face, LFACE_FOREGROUND_INDEX, &face_colors_defaulted);
@@ -7229,6 +7367,9 @@ syms_of_xfaces (void)
   DEFSYM (QCposition, ":position");
   DEFSYM (Qline, "line");
   DEFSYM (Qwave, "wave");
+  DEFSYM (Qdouble, "double");
+  DEFSYM (Qdotted, "dotted");
+  DEFSYM (Qdashed, "dashed");
   DEFSYM (Qreleased_button, "released-button");
   DEFSYM (Qpressed_button, "pressed-button");
   DEFSYM (Qflat_button, "flat-button");
